@@ -111,6 +111,9 @@ function columnHeadingParts
                     if (($workSheet.Cells.Item($headingRowNumber, $j).text).ToUpper().Contains("ALT"))
                     {
                     }
+                    elseif (($workSheet.Cells.Item($headingRowNumber, $j).text).ToUpper().Contains("TYP"))
+                    {
+                    }
                     elseif (($workSheet.Cells.Item($headingRowNumber, $j).text).ToUpper().Contains("REF"))
                     {
                     }
@@ -128,171 +131,193 @@ function columnHeadingParts
 if( -Not ($inputAdminBoundariesTabulardataXlsx | Test-Path) ){
    throw "File or folder does not exist"
 }
-
-if ($outputXlsx | Test-Path)
+else
 {
-   if ($overwrite -eq $true)
-   {
-      Remove-Item $outputXlsx -Force
-   }
-   else
-   {
-      throw ("File : " + $outputXlsx + " already exists")
-   }
-}
-
-Trace $inputAdminBoundariesTabulardataXlsx
-
-$excelInput = new-object -comobject Excel.Application
-$workbook = $excelInput.workbooks.Open($inputAdminBoundariesTabulardataXlsx)
-$sheets = $workbook.sheets
-
-$sheetArray = @()
-# Get naming convention for the Worksheets, e.g.
-#
-# mdg_gazetteer_20181031.xlsx has 'mdg_pop_adm0', 'mdg_pop_adm1', 'mdg_pop_adm2', 'mdg_pop_adm4', 'mdg_pop_adm4'
-# hun_adminboundaries_tabulardata.xlsx 
-# bdi_adminboundaries_tabulardata.xlsx
-#   have:
-#      'Admin0', 'Admin1', 'Admin2'  
-
-$sheetNamingPrefix = SheetNaming -sheetNamesArray $sheets
-
-# We won't know which is the smallest admin level in the spreadsheet
-$sheets | % { ` 
-   if ($_.name.StartsWith($sheetNamingPrefix))
-   {
-      $sheetArray += $_.name
-   }
-}
-$smallestAdminLevelWorksheet = ($sheetArray | sort)[-1]
-$smallestAdminLevel = $smallestAdminLevelWorksheet  -replace "[^0-9]" , ''
-
-$workSheet = $workbook.Sheets.Item($smallestAdminLevelWorksheet)
-
-# Open the smallest admin level worksheet
-Trace ("Worksheet Name : " + $workSheet.Name + " contains " + $workSheet.UsedRange.Rows.Count.ToString() + " rows.")
-
-$pCodePrefix, $pCodeSuffix, $namePrefix, $nameSuffix = columnHeadingParts -workSheet $workSheet -smallestAdminLevel $smallestAdminLevel
-
-$excelOutput = new-object -comobject Excel.Application
-$workbookOutput = $excelOutput.Workbooks.Add()
-$workSheetOutput = $workbookOutput.Worksheets.Item(1)
-$workSheetOutput.Cells.Item(1,1) = "list_name"
-$workSheetOutput.Cells.Item(1,2) = "name"
-$workSheetOutput.Cells.Item(1,3) = "label"
-$columnNumber = 4
-$columns = $workSheet.UsedRange.Columns.Count
-$headingRowNumber = 1
-$nameColumnNumbers = @()
-$pCodeColumnNumbers = @()
-$recordArray = @()
-$recordCollection = @()
-$mostCommonNameColumnNameSuffix = ""
-$suffixes = @()
-
-for ($level=0; $level -le $smallestAdminLevel; $level++)
-{
-#    Write-Host ("TSTSV : " + ($namePrefix + $level + $nameSuffix + '_[a-z][a-z]'))
-    for ($j=1; $j -le $columns; $j++)
+    $directoryForOutputPath = Split-Path -Path $outputXlsx
+    $outputFileName = Split-Path -Path $outputXlsx -Leaf
+    $outputFileNameWithoutSuffix = $outputFileName.split(".")[0]
+    $outputFileNameSuffix = $outputFileName.split(".")[-1]
+    if (($directoryForOutputPath | Test-Path) -eq $false)
     {
-        #if ($workSheet.Cells.Item($headingRowNumber,$j).text -match ($valuePrefix + $level + 'Name_[a-z][a-z]'))
-        if ($workSheet.Cells.Item($headingRowNumber,$j).text -imatch ($namePrefix + $level + $nameSuffix + '_[a-z][a-z]'))
-        {
-#    Write-Host ("YAYTSTSV : " + ($namePrefix + $level + $nameSuffix + '_[a-z][a-z]'))
-            $length = $workSheet.Cells.Item($headingRowNumber,$j).text.length
-            $lastTwoCharacters = ($workSheet.Cells.Item($headingRowNumber,$j).text).substring($length -2)
-            $suffixes += , $lastTwoCharacters 
+        throw ($directoryForOutputPath + " does not exist.")
+    }
+    else
+    {
+        Trace $inputAdminBoundariesTabulardataXlsx
+
+        $excelInput = new-object -comobject Excel.Application
+        $workbook = $excelInput.workbooks.Open($inputAdminBoundariesTabulardataXlsx)
+        $sheets = $workbook.sheets
+
+        $sheetArray = @()
+        # Get naming convention for the Worksheets, e.g.
+        #
+        # mdg_gazetteer_20181031.xlsx has 'mdg_pop_adm0', 'mdg_pop_adm1', 'mdg_pop_adm2', 'mdg_pop_adm4', 'mdg_pop_adm4'
+        # hun_adminboundaries_tabulardata.xlsx 
+        # bdi_adminboundaries_tabulardata.xlsx
+        #   have:
+        #      'Admin0', 'Admin1', 'Admin2'  
+
+        $sheetNamingPrefix = SheetNaming -sheetNamesArray $sheets
+
+        # We won't know which is the smallest admin level in the spreadsheet
+        $sheets | % { ` 
+           if ($_.name.StartsWith($sheetNamingPrefix))
+           {
+              $sheetArray += $_.name
+           }
         }
+        $smallestAdminLevelWorksheet = ($sheetArray | sort)[-1]
+        $smallestAdminLevel = $smallestAdminLevelWorksheet  -replace "[^0-9]" , ''
+
+        $workSheet = $workbook.Sheets.Item($smallestAdminLevelWorksheet)
+
+        # Open the smallest admin level worksheet
+        Trace ("Worksheet Name : " + $workSheet.Name + " contains " + $workSheet.UsedRange.Rows.Count.ToString() + " rows.")
+
+        $pCodePrefix, $pCodeSuffix, $namePrefix, $nameSuffix = columnHeadingParts -workSheet $workSheet -smallestAdminLevel $smallestAdminLevel
+
+        $columns = $workSheet.UsedRange.Columns.Count
+        $headingRowNumber = 1
+        $recordArray = @()
+        $recordCollection = @()
+        $mostCommonNameColumnNameSuffix = ""
+        $suffixes = @()
+
+        for ($level=0; $level -le $smallestAdminLevel; $level++)
+        {
+            for ($j=1; $j -le $columns; $j++)
+            {
+                if (($workSheet.Cells.Item($headingRowNumber,$j).text -imatch ($namePrefix + $level + $nameSuffix + '_[a-z]$')) -or
+                    ($workSheet.Cells.Item($headingRowNumber,$j).text -imatch ($namePrefix + $level + $nameSuffix + '_[a-z][a-z]$')) -or
+                    ($workSheet.Cells.Item($headingRowNumber,$j).text -imatch ($namePrefix + $level + $nameSuffix + '_[a-z][a-z][a-z][a-z]$')))
+                {
+                    $suffixes += , ($workSheet.Cells.Item($headingRowNumber,$j).text).split("_")[-1]
+                }
+            }
+        }
+
+        $languageSuffixes = ($suffixes | Sort-Object | Get-Unique)
+
+        foreach ($languageSuffix in $languageSuffixes)
+        {
+            $outputFile = Join-Path -Path $directoryForOutputPath -ChildPath ($outputFileNameWithoutSuffix + "_" + $languageSuffix + "." + $outputFileNameSuffix)
+            $nameColumnNumbers = @()
+            $pCodeColumnNumbers = @()
+            $excelOutput = new-object -comobject Excel.Application
+            $workbookOutput = $excelOutput.Workbooks.Add()
+            $workSheetOutput = $workbookOutput.Worksheets.Item(1)
+            $workSheetOutput.Cells.Item(1,1) = "list_name"
+            $workSheetOutput.Cells.Item(1,2) = "name"
+            $workSheetOutput.Cells.Item(1,3) = "label"
+            $recordArray = @()
+            $recordCollection = @() 
+            $columnNumber = 4
+
+            # For each Administrative Level, get the AdminName and PCode column numbers 
+            for ($level=0; $level -le $smallestAdminLevel; $level++)
+            {
+                for ($j=1; $j -le $columns; $j++)
+                {
+                    if ($workSheet.Cells.Item($headingRowNumber,$j).text -eq ($namePrefix + $level + $nameSuffix + "_" + $languageSuffix))
+                    {
+                        $nameColumnNumbers += $j
+                    }
+                    elseif ($workSheet.Cells.Item($headingRowNumber,$j).text -eq ($pCodePrefix + $level + $pCodeSuffix))
+                    {
+                        $pCodeColumnNumbers += $j
+                    }
+                }
+                if ($level -lt $smallestAdminLevel)
+                {
+                    $workSheetOutput.Cells.Item(1,$columnNumber) = $namePrefix + $level
+                }
+                Trace("Admin Level " + $level.ToString() + " : Name  column number is column " + $nameColumnNumbers[$level].ToString())
+                Trace("Admin Level " + $level.ToString() + " : PCode column number is column " + $pCodeColumnNumbers[$level].ToString())
+
+                $columnNumber = $columnNumber + 1
+                $recordArray += , @()
+                $recordCollection += , @() 
+            }
+
+            # Start at second row - after the header row
+            for ($r=2; $r -le $workSheet.UsedRange.Rows.Count; $r++)
+            {
+               for ($c = 0; $c -lt $nameColumnNumbers.Count; $c++)
+               {
+                  if ($recordArray[$c] -notcontains $workSheet.Cells.Item($r,$pCodeColumnNumbers[$c]).text)
+                  {
+                     $recordArray[$c] += $workSheet.Cells.Item($r,$pCodeColumnNumbers[$c]).text
+                     if ($workSheet.Cells.Item($r,$pCodeColumnNumbers[$c]).text.Length -gt 0)
+                     {
+                        $recordCollection[$c] += New-Object PSObject -Property @{
+                                                                                   ListName = ($namePrefix + $c)
+                                                                                   Name = $workSheet.Cells.Item($r,$pCodeColumnNumbers[$c]).text
+                                                                                   Label = $workSheet.Cells.Item($r,$nameColumnNumbers[$c]).text
+                                                                                   PreviousAdminValue = $workSheet.Cells.Item($r,$pCodeColumnNumbers[($c-1)]).text
+                                                                                }
+                        Trace("Level: " + $c.ToString() + ": Cell (" + $r + ", " + $pCodeColumnNumbers[($c)] + ") = " + $workSheet.Cells.Item($r,$pCodeColumnNumbers[($c)]).text + " Level: " + ($c-1).ToString() + ": Cell (" + $r + ", " + $pCodeColumnNumbers[($c-1)] + ") = " + $workSheet.Cells.Item($r,$pCodeColumnNumbers[($c-1)]).text)
+                     } 
+                  }   
+               } 
+            }
+
+            $completedSuccessfully=$true
+            Trace("Record counts for the different Administrative Levels:")
+            for ($rc = 0; $rc -lt $recordCollection.Count; $rc++)
+            {
+               Trace("Level " + $rc + " has " + $recordCollection[$rc].Count + " records")
+               if ($recordCollection[$rc].Count -eq 0)
+               {
+                  $completedSuccessfully = $false
+               }
+            }
+
+            $previousCount=2 # Header
+            for ($level=0; $level -le $smallestAdminLevel; $level++)
+            {
+               for ($row = 0; $row -lt $recordArray[$level].Count; $row++)
+               {
+                  $workSheetOutput.Cells.Item(($previousCount+$row),1) = $recordCollection[$level][$row].ListName
+                  $workSheetOutput.Cells.Item(($previousCount+$row),2) = $recordCollection[$level][$row].Name
+                  $workSheetOutput.Cells.Item(($previousCount+$row),3) = $recordCollection[$level][$row].Label
+                  if ($level -gt 0)
+                  {
+                     $workSheetOutput.Cells.Item(($previousCount+$row),(3 + $level)) = $recordCollection[$level][$row].PreviousAdminValue
+                  }
+               }
+               $previousCount = $previousCount+$recordCollection[$level].Count + 1
+            }
+
+            if ($outputFile | Test-Path)
+            {
+               if ($overwrite -eq $true)
+               {
+                  Remove-Item $outputFile -Force
+               }
+            }
+            if ($completedSuccessfully -eq $true)
+            {
+                Write-Host("Output written to " + $outputFile)
+            }
+            # Close files
+            $workbookOutput.SaveAs($outputFile) 
+            $workbookOutput.Close()
+            $excelOutput.Quit()
+            [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($workSheetOutput)
+            [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbookOutput)
+            [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($excelOutput)
+            $releaseResult = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excelOutput)
+            Remove-Variable excelOutput
+            [GC]::Collect()
+
+        }
+        $workbook.Close()
+        $excelInput.Quit()
+        [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($workbook)
+        [void][System.Runtime.Interopservices.Marshal]::ReleaseComObject($excelInput)
+        $releaseResult = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excelInput)
+        Remove-Variable excelInput
+        [GC]::Collect()
     }
 }
-$mostCommonNameColumnNameSuffix = ($suffixes | group | sort count -desc | select -f 1).Name
-
-# For each Administrative Level, get the AdminName and PCode column numbers 
-for ($level=0; $level -le $smallestAdminLevel; $level++)
-{
-    for ($j=1; $j -le $columns; $j++)
-    {
-        if ($workSheet.Cells.Item($headingRowNumber,$j).text -eq ($namePrefix + $level + $nameSuffix + "_" + $lastTwoCharacters))
-        {
-            $nameColumnNumbers += $j
-        }
-        elseif ($workSheet.Cells.Item($headingRowNumber,$j).text -eq ($pCodePrefix + $level + $pCodeSuffix))
-        {
-            $pCodeColumnNumbers += $j
-        }
-    }
-    if ($level -lt $smallestAdminLevel)
-    {
-        $workSheetOutput.Cells.Item(1,$columnNumber) = $namePrefix + $level
-    }
-    Trace("Admin Level " + $level.ToString() + " : Name  column number is column " + $nameColumnNumbers[$level].ToString())
-    Trace("Admin Level " + $level.ToString() + " : PCode column number is column " + $pCodeColumnNumbers[$level].ToString())
-
-    $columnNumber = $columnNumber + 1
-    $recordArray += , @()
-    $recordCollection += , @() 
-}
-
-# Start at second row - after the header row
-for ($r=2; $r -le $workSheet.UsedRange.Rows.Count; $r++)
-{
-   for ($c = 0; $c -lt $nameColumnNumbers.Count; $c++)
-   {
-      if ($recordArray[$c] -notcontains $workSheet.Cells.Item($r,$pCodeColumnNumbers[$c]).text)
-      {
-         $recordArray[$c] += $workSheet.Cells.Item($r,$pCodeColumnNumbers[$c]).text
-         if ($workSheet.Cells.Item($r,$pCodeColumnNumbers[$c]).text.Length -gt 0)
-         {
-            $recordCollection[$c] += New-Object PSObject -Property @{
-                                                                       ListName = ($namePrefix + $c)
-                                                                       Name = $workSheet.Cells.Item($r,$pCodeColumnNumbers[$c]).text
-                                                                       Label = $workSheet.Cells.Item($r,$nameColumnNumbers[$c]).text
-                                                                       PreviousAdminValue = $workSheet.Cells.Item($r,$pCodeColumnNumbers[($c-1)]).text
-                                                                    }
-            Trace("Level: " + $c.ToString() + ": Cell (" + $r + ", " + $pCodeColumnNumbers[($c)] + ") = " + $workSheet.Cells.Item($r,$pCodeColumnNumbers[($c)]).text + " Level: " + ($c-1).ToString() + ": Cell (" + $r + ", " + $pCodeColumnNumbers[($c-1)] + ") = " + $workSheet.Cells.Item($r,$pCodeColumnNumbers[($c-1)]).text)
-         } 
-      }   
-   } 
-}
-
-$completedSuccessfully=$true
-Trace("Record counts for the different Administrative Levels:")
-for ($rc = 0; $rc -lt $recordCollection.Count; $rc++)
-{
-   Trace("Level " + $rc + " has " + $recordCollection[$rc].Count + " records")
-   if ($recordCollection[$rc].Count -eq 0)
-   {
-      $completedSuccessfully = $false
-   }
-}
-
-$previousCount=2 # Header
-for ($level=0; $level -le $smallestAdminLevel; $level++)
-{
-   for ($row = 0; $row -lt $recordArray[$level].Count; $row++)
-   {
-      $workSheetOutput.Cells.Item(($previousCount+$row),1) = $recordCollection[$level][$row].ListName
-      $workSheetOutput.Cells.Item(($previousCount+$row),2) = $recordCollection[$level][$row].Name
-      $workSheetOutput.Cells.Item(($previousCount+$row),3) = $recordCollection[$level][$row].Label
-      if ($level -gt 0)
-      {
-         $workSheetOutput.Cells.Item(($previousCount+$row),(3 + $level)) = $recordCollection[$level][$row].PreviousAdminValue
-      }
-   }
-   $previousCount = $previousCount+$recordCollection[$level].Count + 1
-}
-
-if ($completedSuccessfully -eq $true)
-{
-    Write-Host("Output written to " + $outputXlsx)
-}
-# Close files
-$excelInput.Quit()
-$releaseResult = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excelInput)
-Remove-Variable excelInput
-
-$workbookOutput.SaveAs($outputXlsx) 
-$excelOutput.Quit()
-$releaseResult = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excelOutput)
-Remove-Variable excelOutput
