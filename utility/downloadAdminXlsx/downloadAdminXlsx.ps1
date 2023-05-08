@@ -22,7 +22,7 @@ param(
      )
 # Test Folder exists
 if (Test-Path -Path $folder) {
-    $WShell = New-Object -com “Wscript.Shell”
+    $WShell = New-Object -com "Wscript.Shell"
 
     # Get all the package names
     $url = "https://data.humdata.org/api/3/action/package_list"
@@ -33,7 +33,7 @@ if (Test-Path -Path $folder) {
     foreach($result in $myJson.result)
     {
         # Stop screen from timing out
-        $WShell.sendkeys(“{SCROLLLOCK}”)
+        $WShell.sendkeys("{SCROLLLOCK}")
 
         # Get all the details for this package
         $url = "https://data.humdata.org/api/3/action/package_show?id=" + $result
